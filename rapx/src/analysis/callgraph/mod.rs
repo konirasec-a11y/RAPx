@@ -1,5 +1,6 @@
 pub mod default;
 pub mod visitor;
+pub(crate) mod jsonl;
 
 use crate::Analysis;
 use rustc_hir::def_id::DefId;

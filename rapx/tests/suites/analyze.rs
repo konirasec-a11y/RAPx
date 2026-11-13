@@ -6,6 +6,37 @@ fn assert_any(output: &str, patterns: &[&str], msg: &str, full: &str) {
     panic!("{}: tried {:?}\nFull output:\n{}", msg, patterns, full);
 }
 
+#[test]
+fn callgraph_jsonl_default_full_and_truncated_exports() {
+    let text = run_with_args("analyze/callgraph_jsonl", &["analyze", "callgraph"]);
+    assert_contain(&text, "CallGraph:");
+    assert_contain(&text, "entry calls:");
+    assert_not_contain(&text, "rapx.callgraph/v1");
+    for limit in ["0", "1"] {
+        let output = run_with_args("analyze/callgraph_jsonl", &[
+            "analyze", "callgraph", "--format", "jsonl", "--max-edges", limit,
+        ]);
+        let records: Vec<serde_json::Value> = output.lines()
+            .filter_map(|line| line.strip_prefix("RAPX_CALLGRAPH_JSONL "))
+            .map(|line| serde_json::from_str(line).expect("invalid JSONL"))
+            .collect();
+        assert!(!records.is_empty(), "No JSONL records:\n{output}");
+        assert_eq!(records[0]["kind"], "header");
+        assert_eq!(records[0]["cargo_package"], "callgraph_jsonl");
+        assert_eq!(records[0]["compiler_crate"], "callgraph_jsonl");
+        let footer = records.last().expect("missing completion footer");
+        assert_eq!(footer["kind"], "complete");
+        assert_eq!(footer["export_complete"], true);
+        assert_eq!(footer["total_observed_records"], 2);
+        assert_eq!(footer["total_unique_edges"], 1);
+        assert_eq!(footer["duplicate_records"], 1);
+        assert_eq!(footer["emitted_edges"], limit.parse::<usize>().unwrap());
+        assert_eq!(footer["omitted_edges"], usize::from(limit == "0"));
+        assert_eq!(footer["coverage"], if limit == "0" { "truncated" } else { "untruncated" });
+        assert_not_contain(&output, "CallGraph:");
+    }
+}
+
 // ===============Alias(MOP) Analysis Tests==============
 #[test]
 fn alias_01_mop() {

@@ -3,6 +3,25 @@ use std::path::PathBuf;
 
 pub const DEFAULT_POSTFIX_REPEAT: usize = 0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum CallgraphFormat {
+    Text,
+    Jsonl,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CallgraphArgs {
+    /// Output format. JSONL payloads use a RAPX_CALLGRAPH_JSONL frame on stderr to survive Cargo's diagnostic transport.
+    #[arg(long, value_enum, default_value_t = CallgraphFormat::Text)]
+    pub format: CallgraphFormat,
+    /// Maximum unique relations in JSONL mode; zero emits only metadata and counts.
+    #[arg(long, default_value_t = 1000, value_parser = clap::value_parser!(u32).range(0..=100_000))]
+    pub max_edges: u32,
+    /// Maximum JSONL bytes, including header/footer. Text output is unchanged.
+    #[arg(long, default_value_t = 4 * 1024 * 1024, value_parser = clap::value_parser!(u32).range(4096..=64 * 1024 * 1024))]
+    pub max_bytes: u32,
+}
+
 #[derive(Debug, Clone, Args)]
 pub struct AdgArgs {
     #[arg(long)]
@@ -57,7 +76,7 @@ pub enum AnalysisKind {
         draw: bool,
     },
     /// generate callgraphs
-    Callgraph,
+    Callgraph(CallgraphArgs),
     /// generate dataflow graphs
     Dataflow {
         /// print debug information during dataflow analysis

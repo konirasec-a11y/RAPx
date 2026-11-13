@@ -39,7 +39,8 @@ use crate::{
     analysis::{alias::mfp::MfpAliasAnalyzer, api_dependency, scan::ScanAnalysis},
     check::{opt::Opt, rcanary::rCanary, safedrop::SafeDrop},
     cli::{
-        AliasStrategyKind, AnalysisKind, CheckArgs, Commands, PostfixRepeat, RapxArgs, VerifyArgs,
+        AliasStrategyKind, AnalysisKind, CallgraphFormat, CheckArgs, Commands, PostfixRepeat, RapxArgs,
+        VerifyArgs,
     },
     verify::{driver::VerifyRun, loop_sensitivity::RepeatStrategy, target::PrepareTargets},
 };
@@ -221,17 +222,23 @@ pub fn start_analyzer(tcx: TyCtxt, callback: &RapCallback) {
                     .with_draw(draw)
                     .start(TargetCrate::Std);
             }
-            AnalysisKind::Callgraph => {
+            AnalysisKind::Callgraph(args) => {
                 let mut analyzer = CallGraphAnalyzer::new(tcx);
                 analyzer.run();
                 let callgraph = analyzer.get_fn_calls();
-                rap_info!(
-                    "{}",
-                    FnCallDisplay {
-                        fn_calls: &callgraph,
-                        tcx
+                match args.format {
+                    CallgraphFormat::Text => rap_info!(
+                        "{}",
+                        FnCallDisplay { fn_calls: &callgraph, tcx }
+                    ),
+                    CallgraphFormat::Jsonl => {
+                        if let Err(error) = analysis::callgraph::jsonl::emit(
+                            &callgraph, tcx, callback.args.test_crate.as_deref(), args,
+                        ) {
+                            rap_error!("Callgraph JSONL export failed: {error}");
+                        }
                     }
-                );
+                }
             }
             &AnalysisKind::Dataflow { debug, draw } => {
                 let mut analyzer = DataflowAnalyzer::new(tcx, debug).with_draw(draw);
