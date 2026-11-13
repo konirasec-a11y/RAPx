@@ -21,6 +21,13 @@ fn assert_result_counts(output: &str, expected: [usize; 3]) {
 }
 
 #[test]
+fn closure_callees_are_not_classified_as_range_methods() {
+    let output = run_with_args("verify_units/closure_range_classification", CMD_VERIFY_TARGETED);
+    assert_function_result(&output, "closure_before_unsafe", "SOUND");
+    assert!(!output.contains("internal compiler error"), "{output}");
+}
+
+#[test]
 fn vm_state_precision_01() {
     let modes: [&[&str]; 2] = [
         CMD_VERIFY_TARGETED,

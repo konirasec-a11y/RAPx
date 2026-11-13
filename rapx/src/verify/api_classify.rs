@@ -37,19 +37,23 @@ pub(crate) fn is_range_advancing_call<'tcx>(
     else {
         return false;
     };
-    let sig = tcx.fn_sig(callee).skip_binder();
-    let inputs = sig.inputs().skip_binder();
     let range_owner = crate::helpers::name::get_struct_self_ty(tcx, callee).is_some_and(|ty| {
         matches!(ty.kind(), TyKind::Adt(adt, _)
             if lang_api::matches(tcx, adt.did(), LangItem::Range)
                 || lang_api::matches(tcx, adt.did(), LangItem::RangeInclusiveStruct))
     });
+    // Resolved closure calls are valid here, but `TyCtxt::fn_sig` cannot be
+    // queried for closure DefIds. Only a Range method is a candidate.
+    if !range_owner {
+        return false;
+    }
+    let sig = tcx.fn_sig(callee).skip_binder();
+    let inputs = sig.inputs().skip_binder();
     inputs.len() == 1
         && matches!(
             inputs.first().map(|ty| ty.kind()),
             Some(TyKind::Ref(_, _, Mutability::Mut))
         )
-        && range_owner
         && matches!(
             sig.output().skip_binder().kind(),
             TyKind::Adt(adt, _) if tcx.is_diagnostic_item(rustc_span::sym::Option, adt.did())
